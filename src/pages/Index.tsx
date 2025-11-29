@@ -11,18 +11,51 @@ const Index = () => {
   const [volume, setVolume] = useState([70]);
   const [currentTrack, setCurrentTrack] = useState({
     title: 'Радио ЧТД',
-    artist: 'В эфире',
+    artist: 'Загрузка...',
     cover: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=400&h=400&fit=crop'
   });
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const streamUrl = 'http://176.108.192.17:8000/stream';
+  const statusUrl = 'http://176.108.192.17:8000/status-json.xsl';
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume[0] / 100;
     }
   }, [volume]);
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        const response = await fetch(statusUrl);
+        const data = await response.json();
+        
+        if (data?.icestats?.source) {
+          const source = Array.isArray(data.icestats.source) 
+            ? data.icestats.source[0] 
+            : data.icestats.source;
+          
+          if (source?.title) {
+            const parts = source.title.split(' - ');
+            setCurrentTrack({
+              title: parts.length > 1 ? parts[1] : source.title,
+              artist: parts.length > 1 ? parts[0] : 'В эфире',
+              cover: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=400&h=400&fit=crop'
+            });
+          }
+        }
+      } catch (error) {
+        console.log('Не удалось загрузить метаданные:', error);
+        setCurrentTrack(prev => ({ ...prev, artist: 'В эфире' }));
+      }
+    };
+
+    fetchMetadata();
+    const interval = setInterval(fetchMetadata, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const togglePlay = () => {
     if (audioRef.current) {
